@@ -1,5 +1,8 @@
 import streamlit as st
 from utils.profile_parser import build_profile
+from matching.property_match import match_properties
+from matching.roommate_match import match_roommates
+
 
 QUESTIONS = [
     ("budget", "What is your monthly rent budget (HKD)?"),
@@ -15,11 +18,13 @@ QUESTIONS = [
 st.set_page_config(page_title="HomeMatch MVP")
 st.title("🏠 HomeMatch AI Onboarding")
 
+# ----- Session State -----
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 current_q = len(st.session_state.chat_history)
 
+# ----- Chatbot Flow -----
 if current_q < len(QUESTIONS):
     key, question = QUESTIONS[current_q]
     st.chat_message("assistant").write(question)
@@ -28,10 +33,44 @@ if current_q < len(QUESTIONS):
 
     if user_input:
         st.session_state.chat_history.append((key, user_input))
-        st.rerun()   # ✅ THIS IS ESSENTIAL
+        st.rerun()
+
+# ----- Post-Onboarding -----
 else:
     st.success("✅ Onboarding completed")
 
     profile = build_profile(st.session_state.chat_history)
+
     st.subheader("🧠 Generated User Profile")
     st.json(profile)
+
+    
+    st.subheader("✅ DEBUG: post-onboarding section reached")
+    st.write("DEBUG marker: button should appear below")
+
+
+    # ----- Run Matching -----
+    if st.button("🔍 Run Matching"):
+        property_results = match_properties(profile)
+        roommate_results = match_roommates(profile)
+
+        # ----- Property Results -----
+        st.subheader("🏠 Property Matches")
+        for p in property_results:
+            with st.expander(f"{p['area']} | Score: {p['score']}"):
+                st.write("Rent:", p["rent"])
+                st.write("Commute Time:", p["commute_time"], "mins")
+                st.write("Room Type:", p["room_type"])
+                st.write("Why this match:")
+                for r in p["reasons"]:
+                    st.write("-", r)
+
+        # ----- Roommate Results -----
+        st.subheader("🤝 Roommate Matches")
+        for r in roommate_results:
+            with st.expander(
+                f"{r['name']} | Compatibility: {r['compatibility_score']}%"
+            ):
+                st.write("Why compatible:")
+                for reason in r["reasons"]:
+                    st.write("-", reason)
